@@ -190,7 +190,7 @@ def get_pipeline_config(max_iterations: int, enable_ranking: bool, quality_thres
 
 def display_pipeline_flow():
     """Display the pipeline flow diagram."""
-    st.markdown("### 🔀 Pipeline Flow")
+    st.markdown("### Pipeline Flow")
     
     flow_diagram = """
     digraph {
@@ -318,7 +318,7 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.markdown("### 📁 Upload Data")
+        st.markdown("### Upload Data")
         
         uploaded_file = st.file_uploader(
             "Choose a CSV file",
@@ -343,7 +343,7 @@ def main():
         display_pipeline_flow()
     
     if st.session_state.uploaded_data is not None:
-        st.markdown("### 👀 Data Preview")
+        st.markdown("### Data Preview")
         st.dataframe(
             st.session_state.uploaded_data.head(max_preview),
             use_container_width=True,

@@ -2,7 +2,7 @@
 
 from typing import Protocol
 import pandas as pd
-from common.types import DataProfile
+from src.common.types import DataProfile
 
 
 class DataProfiler(Protocol):

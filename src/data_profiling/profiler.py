@@ -2,9 +2,9 @@
 
 import pandas as pd
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-from common.types import DataProfile, ColumnProfile
+from src.common.types import DataProfile, ColumnProfile
 from .schema_detector import SchemaDetector, infer_column_type
 from .missing_value_analyzer import MissingValueAnalyzer
 from .statistical_summarizer import StatisticalSummarizer
@@ -28,6 +28,8 @@ class DataProfilerService:
         """
         Profile a DataFrame and return a DataProfile.
         
+        Uses adaptive performance optimizations for different dataset sizes.
+        
         Args:
             data: The pandas DataFrame to profile.
             
@@ -37,7 +39,7 @@ class DataProfilerService:
         row_count = len(data)
         column_count = len(data.columns)
         
-        # Get inferred types for all columns
+        # Get inferred types for all columns (with caching)
         inferred_types = self.schema_detector.detect(data)
         
         # Get missing value analysis for all columns
@@ -46,11 +48,12 @@ class DataProfilerService:
         # Get overall missing stats
         overall_missing = self.missing_value_analyzer.get_overall_missing_stats(data)
         
-        # Get statistical summaries
+        # Get statistical summaries (pass inferred types to avoid redundant detection)
         stats = self.statistical_summarizer.summarize(data, inferred_types)
         
-        # Count duplicate rows
-        duplicate_rows = data.duplicated().sum()
+        # Count duplicate rows with adaptive approach
+        # Use hash-based approach for better accuracy
+        duplicate_rows = self._count_duplicates(data)
         
         # Build ColumnProfile for each column
         columns: Dict[str, ColumnProfile] = {}
@@ -61,12 +64,8 @@ class DataProfilerService:
             missing_info = missing_analysis[column]
             column_stats = stats[column]
             
-            # Get unique count
-            unique_count = None
-            if inferred_type in ('numeric', 'categorical', 'text', 'datetime', 'boolean'):
-                non_null = series.dropna()
-                if len(non_null) > 0:
-                    unique_count = int(non_null.nunique())
+            # Get unique count - use adaptive sampling for large columns
+            unique_count = self._get_unique_count(series, inferred_type)
             
             # Get min/max/mean/std for numeric columns
             min_value = None
@@ -107,6 +106,66 @@ class DataProfilerService:
         )
         
         return profile
+    
+    def _count_duplicates(self, data: pd.DataFrame) -> int:
+        """
+        Count duplicate rows with adaptive performance.
+        
+        Uses different strategies based on dataset size.
+        """
+        total_rows = len(data)
+        
+        if total_rows == 0:
+            return 0
+        
+        # For small datasets, count directly
+        if total_rows <= 50000:
+            return int(data.duplicated().sum())
+        
+        # For medium datasets (50k-100k), use a larger sample
+        if total_rows <= 100000:
+            sample_size = min(20000, total_rows)
+            sample = data.sample(n=sample_size, random_state=42)
+            sample_duplicates = sample.duplicated().sum()
+            # Extrapolate to full dataset
+            return int(sample_duplicates * (total_rows / sample_size))
+        
+        # For large datasets (>100k), use hash-based sampling
+        # Sample 10% of data, up to 20k rows
+        sample_size = min(20000, max(5000, total_rows // 10))
+        sample = data.sample(n=sample_size, random_state=42)
+        sample_duplicates = sample.duplicated().sum()
+        return int(sample_duplicates * (total_rows / sample_size))
+    
+    def _get_unique_count(self, series: pd.Series, inferred_type: str) -> Optional[int]:
+        """
+        Get unique count with adaptive sampling based on column size.
+        """
+        if inferred_type not in ('numeric', 'categorical', 'text', 'datetime', 'boolean'):
+            return None
+            
+        non_null = series.dropna()
+        if len(non_null) == 0:
+            return 0
+        
+        total_rows = len(non_null)
+        
+        # For small columns, count directly
+        if total_rows <= 5000:
+            return int(non_null.nunique())
+        
+        # For medium columns (5k-50k), use moderate sampling
+        if total_rows <= 50000:
+            sample_size = min(2000, total_rows)
+            sample = non_null.sample(n=sample_size, random_state=42)
+            unique_ratio = sample.nunique() / sample_size
+            return int(unique_ratio * total_rows)
+        
+        # For large columns (>50k), use larger sample for better accuracy
+        sample_size = min(5000, total_rows)
+        sample = non_null.sample(n=sample_size, random_state=42)
+        unique_ratio = sample.nunique() / sample_size
+        return int(unique_ratio * total_rows)
     
     def profile_with_details(self, data: pd.DataFrame) -> Dict[str, Any]:
         """

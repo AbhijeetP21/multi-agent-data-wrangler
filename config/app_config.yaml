@@ -1,0 +1,17 @@
+# Application Configuration
+# Multi-Agent Data Wrangler Web App
+
+app:
+  title: "Multi-Agent Data Wrangler"
+  description: "AI-powered data wrangling pipeline"
+  theme: "light"
+
+display:
+  show_flow: true
+  show_progress: true
+  max_preview_rows: 100
+
+pipeline:
+  default_max_iterations: 10
+  default_quality_threshold: 0.8
+  default_enable_ranking: true

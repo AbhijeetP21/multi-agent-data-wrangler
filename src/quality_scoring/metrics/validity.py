@@ -7,6 +7,10 @@ import pandas as pd
 from .base import BaseMetric
 
 
+# Performance thresholds
+LARGE_DATASET_SAMPLE = 50000
+
+
 class ValidityMetric(BaseMetric):
     """Metric that calculates value range validity."""
 
@@ -16,6 +20,8 @@ class ValidityMetric(BaseMetric):
 
         Checks if values fall within expected ranges for their column types.
         Uses profile information if available, otherwise uses general heuristics.
+
+        Uses sampling for very large datasets to improve performance.
 
         Args:
             data: The DataFrame to calculate validity for.
@@ -30,6 +36,13 @@ class ValidityMetric(BaseMetric):
         if data.shape[1] == 0:
             return 1.0
 
+        total_rows = len(data)
+        
+        # Use sampling for very large datasets
+        if total_rows > LARGE_DATASET_SAMPLE:
+            sample_size = min(10000, total_rows)
+            data = data.sample(n=sample_size, random_state=42)
+        
         validity_scores = []
 
         for col in data.columns:
@@ -72,14 +85,21 @@ class ValidityMetric(BaseMetric):
             min_val = profile.min_value
             max_val = profile.max_value
 
-            if min_val is not None and max_val is not None:
-                valid_count = ((series >= min_val) & (series <= max_val)).sum()
-            elif min_val is not None:
-                valid_count = (series >= min_val).sum()
-            elif max_val is not None:
-                valid_count = (series <= max_val).sum()
-            else:
-                # No constraints, assume valid
+            try:
+                # Try to convert series to numeric first
+                numeric_series = pd.to_numeric(series, errors='coerce')
+                
+                if min_val is not None and max_val is not None:
+                    valid_count = ((numeric_series >= min_val) & (numeric_series <= max_val)).sum()
+                elif min_val is not None:
+                    valid_count = (numeric_series >= min_val).sum()
+                elif max_val is not None:
+                    valid_count = (numeric_series <= max_val).sum()
+                else:
+                    # No constraints, assume valid
+                    valid_count = total_count
+            except (TypeError, ValueError):
+                # If conversion fails, assume valid
                 valid_count = total_count
 
         elif pd.api.types.is_datetime64_any_dtype(dtype):

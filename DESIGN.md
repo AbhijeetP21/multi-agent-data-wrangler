@@ -54,17 +54,6 @@ class DataProfiler(Protocol):
     def profile(self, data: pd.DataFrame) -> DataProfile: ...
 ```
 
-**Artifacts**:
-- `DataProfile`: Schema, missing values, type inference, statistics
-- `ColumnProfile`: Per-column analysis
-- `DataQualityReport`: Initial quality assessment
-
-**Key Classes**:
-- `SchemaDetector`: Infer column types
-- `MissingValueAnalyzer`: Detect and quantify missing values
-- `StatisticalSummarizer`: Compute descriptive statistics
-- `DataProfilerService`: Main orchestrator for profiling
-
 ### 4.2 Transformation Module (`src/transformation/`)
 
 **Responsibility**: Generate and execute deterministic data transformations
@@ -76,17 +65,6 @@ class TransformationEngine(Protocol):
     def execute(self, data: pd.DataFrame, transformation: Transformation) -> pd.DataFrame: ...
     def reverse(self, data: pd.DataFrame, transformation: Transformation) -> pd.DataFrame: ...
 ```
-
-**Artifacts**:
-- `Transformation`: Type-safe transformation definition
-- `TransformationDAG`: Directed acyclic graph of transformations
-- `TransformationResult`: Execution result with metadata
-
-**Key Classes**:
-- `CandidateGenerator`: Generate transformation candidates
-- `TransformationExecutor`: Execute transformations deterministically
-- `DAGBuilder`: Build and validate transformation DAG
-- `ReversibilityChecker`: Verify transformations can be reversed
 
 ### 4.3 Validation Module (`src/validation/`)
 
@@ -100,16 +78,6 @@ class ValidationEngine(Protocol):
     def check_leakage(self, original: pd.DataFrame, transformed: pd.DataFrame) -> bool: ...
 ```
 
-**Artifacts**:
-- `ValidationResult`: Pass/fail with detailed issues
-- `IntegrityCheck`: Schema, range, uniqueness validation
-- `LeakageReport`: Information leakage detection
-
-**Key Classes**:
-- `IntegrityValidator`: Check data integrity
-- `LeakageDetector`: Detect information leakage
-- `SchemaValidator`: Verify schema compatibility
-
 ### 4.4 Quality Scoring Module (`src/quality_scoring/`)
 
 **Responsibility**: Compute quality metrics and composite scores
@@ -120,16 +88,6 @@ class QualityScorer(Protocol):
     def score(self, data: pd.DataFrame, profile: DataProfile) -> QualityMetrics: ...
     def compare(self, before: QualityMetrics, after: QualityMetrics) -> QualityDelta: ...
 ```
-
-**Artifacts**:
-- `QualityMetrics`: Individual quality metric values
-- `QualityDelta`: Before/after comparison
-- `CompositeScore`: Weighted quality score
-
-**Key Classes**:
-- `MetricCalculator`: Calculate individual metrics
-- `CompositeScoreCalculator`: Compute weighted scores
-- `QualityComparator`: Compare pre/post transformation quality
 
 ### 4.5 Ranking Module (`src/ranking/`)
 
@@ -142,15 +100,6 @@ class RankingEngine(Protocol):
     def set_policy(self, policy: RankingPolicy) -> None: ...
 ```
 
-**Artifacts**:
-- `RankedTransformation`: Transformation with score and rank
-- `RankingReport`: Full ranking analysis
-
-**Key Classes**:
-- `ScoreRanker`: Rank by composite score
-- `PolicyManager`: Manage ranking policies
-- `RankingReporter`: Generate ranking reports
-
 ### 4.6 Orchestrator Module (`src/orchestrator/`)
 
 **Responsibility**: Coordinate agents, manage state, handle failures
@@ -162,24 +111,11 @@ class Orchestrator(Protocol):
     def recover(self, state: PipelineState) -> None: ...
 ```
 
-**Artifacts**:
-- `PipelineState`: Current pipeline execution state
-- `PipelineResult`: Final pipeline output
-- `ExecutionLog`: Detailed execution trace
+### 4.7 Web UI Module (`web_app/`)
 
-**Key Classes**:
-- `PipelineManager`: Manage pipeline execution
-- `AgentCoordinator`: Coordinate agent activities
-- `StateManager`: Manage pipeline state
-- `FailureRecovery`: Handle and recover from failures
+**Responsibility**: Provide user-friendly web interface for pipeline execution
 
-### 4.7 Common Module (`src/common/`)
-
-**Shared utilities**:
-- `types/`: Pydantic schemas for all data types
-- `config/`: Configuration management
-- `logging/`: Structured logging setup
-- `exceptions/`: Custom exceptions
+**Public Interface**: Streamlit-based web application
 
 ## 5. Data Flow
 
@@ -285,14 +221,31 @@ data-wrangler rank --candidates candidates/ --profile profile.json
 data-wrangler agent --name profiling --input data/input.csv
 ```
 
-## 10. Extension Points
+## 10. Web UI (Streamlit)
+
+```bash
+# Run web UI locally
+streamlit run web_app/app.py
+
+# Or via CLI
+python -m streamlit run web_app/app.py
+```
+
+### Web UI Features:
+- File upload for CSV data
+- Pipeline flow visualization
+- Real-time progress display
+- Results dashboard
+- Download transformed data
+
+## 11. Extension Points
 
 1. **Custom Transformations**: Implement `Transformation` protocol
 2. **Custom Metrics**: Implement `QualityMetric` protocol
 3. **Custom Ranking Policies**: Implement `RankingPolicy` protocol
 4. **Custom Validators**: Implement `Validator` protocol
 
-## 11. Error Handling
+## 12. Error Handling
 
 - All errors inherit from `DataWranglerError`
 - Pipeline failures are logged with full context

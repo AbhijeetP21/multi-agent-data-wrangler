@@ -1,6 +1,6 @@
 """Encode categorical transformation."""
 
-from typing import Any
+from typing import Any, List, Tuple
 
 import pandas as pd
 import numpy as np
@@ -28,10 +28,12 @@ class EncodeCategoricalTransformation(BaseTransformation):
 
         if method == "label":
             # Label encoding - convert categories to integers
-            unique_values = sorted(data[column].dropna().unique())
+            # Get unique values and handle mixed types safely
+            unique_values = self._get_sorted_unique_values(data[column])
             mapping = {val: idx for idx, val in enumerate(unique_values)}
 
-            result[column] = data[column].map(mapping)
+            # Map values, handling unknown values as -1
+            result[column] = data[column].map(lambda x: mapping.get(x, -1) if pd.notna(x) else np.nan)
 
             # Store mapping for reversal
             self.set_metadata("mapping", mapping)
@@ -40,7 +42,11 @@ class EncodeCategoricalTransformation(BaseTransformation):
 
         elif method == "onehot":
             # One-hot encoding - create binary columns for each category
-            dummies = pd.get_dummies(data[column], prefix=column, drop_first=False)
+            # Handle NaN values by filling them first
+            fill_value = self.params.get("fill_na", "Unknown")
+            series_filled = data[column].fillna(fill_value)
+            
+            dummies = pd.get_dummies(series_filled, prefix=column, drop_first=False)
 
             # Add one-hot columns and drop original
             result = pd.concat([data, dummies], axis=1)
@@ -50,8 +56,41 @@ class EncodeCategoricalTransformation(BaseTransformation):
             self.set_metadata("categories", list(dummies.columns))
             self.set_metadata("method", "onehot")
             self.set_metadata("original_column", column)
+            self.set_metadata("fill_na", fill_value)
 
         return result
+    
+    def _get_sorted_unique_values(self, series: pd.Series) -> List[Any]:
+        """Get sorted unique values from a series, handling mixed types safely."""
+        # Drop NaN values
+        non_null = series.dropna()
+        
+        if len(non_null) == 0:
+            return []
+        
+        # Get unique values
+        unique_vals = non_null.unique()
+        
+        # Try to sort numerically first, fall back to string sorting
+        try:
+            # Try numeric sort
+            numeric_vals = []
+            for v in unique_vals:
+                try:
+                    numeric_vals.append((float(v), v))
+                except (ValueError, TypeError):
+                    # Not numeric, use string
+                    numeric_vals.append((float('inf'), v))
+            
+            numeric_vals.sort(key=lambda x: x[0])
+            return [v[1] for v in numeric_vals]
+        except Exception:
+            # Fall back to string sorting with safe string conversion
+            try:
+                return sorted(unique_vals, key=lambda x: str(x))
+            except Exception:
+                # Last resort - return as is
+                return list(unique_vals)
 
     def reverse(self, data: pd.DataFrame) -> pd.DataFrame:
         """Reverse the encoding.

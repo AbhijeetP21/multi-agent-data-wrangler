@@ -1,0 +1,6 @@
+# Web App Dependencies
+# Multi-Agent Data Wrangler
+
+streamlit>=1.28
+pandas>=2.0
+graphviz

@@ -24,17 +24,25 @@ class RemoveOutliersTransformation(BaseTransformation):
         column = self.target_columns[0]
 
         result = data.copy()
+        
+        # Convert to numeric first
+        numeric_col = pd.to_numeric(data[column], errors='coerce')
+        
+        # Check if we have valid numeric data
+        if numeric_col.isna().all():
+            # No valid numeric data, skip transformation
+            return result
 
         if method == "iqr":
             # IQR-based outlier removal
-            Q1 = data[column].quantile(0.25)
-            Q3 = data[column].quantile(0.75)
+            Q1 = numeric_col.quantile(0.25)
+            Q3 = numeric_col.quantile(0.75)
             IQR = Q3 - Q1
 
             lower_bound = Q1 - threshold * IQR
             upper_bound = Q3 + threshold * IQR
 
-            mask = (result[column] >= lower_bound) & (result[column] <= upper_bound)
+            mask = (numeric_col >= lower_bound) & (numeric_col <= upper_bound)
             result = result[mask]
 
             # Store bounds for reference
@@ -45,11 +53,11 @@ class RemoveOutliersTransformation(BaseTransformation):
 
         elif method == "zscore":
             # Z-score based outlier removal
-            mean = data[column].mean()
-            std = data[column].std()
+            mean = numeric_col.mean()
+            std = numeric_col.std()
 
             if std > 0:
-                z_scores = np.abs((data[column] - mean) / std)
+                z_scores = np.abs((numeric_col - mean) / std)
                 result = result[z_scores <= threshold]
 
             # Store stats for reference

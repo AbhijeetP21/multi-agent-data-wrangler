@@ -13,12 +13,35 @@ from .schema_detector import (
 )
 
 
+# Adaptive sampling thresholds
+SMALL_DATASET = 10000
+MEDIUM_DATASET = 50000
+LARGE_DATASET = 100000
+
+SAMPLE_SIZE_SMALL = 2000
+SAMPLE_SIZE_MEDIUM = 5000
+SAMPLE_SIZE_LARGE = 10000
+
+
+def _get_sample_size(total_rows: int) -> int:
+    """Get appropriate sample size based on dataset size."""
+    if total_rows > LARGE_DATASET:
+        return SAMPLE_SIZE_LARGE
+    elif total_rows > MEDIUM_DATASET:
+        return SAMPLE_SIZE_MEDIUM
+    elif total_rows > SMALL_DATASET:
+        return SAMPLE_SIZE_SMALL
+    return total_rows  # No sampling for small datasets
+
+
 class StatisticalSummarizer:
     """Computes descriptive statistics for DataFrame columns."""
     
     def summarize_numeric(self, series: pd.Series) -> Dict[str, Optional[float]]:
         """
         Compute statistical summaries for numeric columns.
+        
+        Uses adaptive sampling based on dataset size for better accuracy/performance trade-off.
         
         Args:
             series: The numeric pandas Series to summarize.
@@ -41,31 +64,82 @@ class StatisticalSummarizer:
                 'variance': None,
                 'skewness': None,
                 'kurtosis': None,
-                'count': 0,
-                'valid_count': 0
+                'count': int(len(series)),
+                'valid_count': 0,
+                'sampled': False
             }
         
-        # Calculate statistics
-        stats = {
-            'min': float(non_null.min()),
-            'max': float(non_null.max()),
-            'mean': float(non_null.mean()),
-            'std': float(non_null.std()) if len(non_null) > 1 else 0.0,
-            'median': float(non_null.median()),
-            'q25': float(non_null.quantile(0.25)),
-            'q75': float(non_null.quantile(0.75)),
-            'variance': float(non_null.var()) if len(non_null) > 1 else 0.0,
-            'skewness': float(non_null.skew()) if len(non_null) > 2 else 0.0,
-            'kurtosis': float(non_null.kurtosis()) if len(non_null) > 3 else 0.0,
-            'count': int(len(series)),
-            'valid_count': int(len(non_null))
-        }
+        # Try to convert to numeric - this handles string columns that should be numeric
+        numeric_series = pd.to_numeric(non_null, errors='coerce')
+        
+        # Check if we have valid numeric data after conversion
+        valid_numeric = numeric_series.dropna()
+        
+        if len(valid_numeric) == 0:
+            # No valid numeric data - return empty stats
+            return {
+                'min': None,
+                'max': None,
+                'mean': None,
+                'std': None,
+                'median': None,
+                'q25': None,
+                'q75': None,
+                'variance': None,
+                'skewness': None,
+                'kurtosis': None,
+                'count': int(len(series)),
+                'valid_count': 0,
+                'sampled': False
+            }
+        
+        # Use adaptive sampling based on dataset size
+        sample_size = _get_sample_size(len(valid_numeric))
+        
+        if len(valid_numeric) > sample_size:
+            # Use sampled data for stats calculation
+            sampled = valid_numeric.sample(n=sample_size, random_state=42)
+            stats = {
+                'min': float(sampled.min()),
+                'max': float(sampled.max()),
+                'mean': float(sampled.mean()),
+                'std': float(sampled.std(ddof=0)) if len(sampled) > 1 else 0.0,
+                'median': float(sampled.median()),
+                'q25': float(sampled.quantile(0.25)),
+                'q75': float(sampled.quantile(0.75)),
+                'variance': float(sampled.var(ddof=0)) if len(sampled) > 1 else 0.0,
+                'skewness': None,
+                'kurtosis': None,
+                'count': int(len(series)),
+                'valid_count': int(len(valid_numeric)),
+                'sampled': True,
+                'sample_size': sample_size
+            }
+        else:
+            # Calculate full statistics for smaller datasets
+            stats = {
+                'min': float(valid_numeric.min()),
+                'max': float(valid_numeric.max()),
+                'mean': float(valid_numeric.mean()),
+                'std': float(valid_numeric.std(ddof=0)) if len(valid_numeric) > 1 else 0.0,
+                'median': float(valid_numeric.median()),
+                'q25': float(valid_numeric.quantile(0.25)),
+                'q75': float(valid_numeric.quantile(0.75)),
+                'variance': float(valid_numeric.var(ddof=0)) if len(valid_numeric) > 1 else 0.0,
+                'skewness': None,
+                'kurtosis': None,
+                'count': int(len(series)),
+                'valid_count': int(len(valid_numeric)),
+                'sampled': False
+            }
         
         return stats
     
     def summarize_categorical(self, series: pd.Series) -> Dict[str, Any]:
         """
         Compute statistical summaries for categorical columns.
+        
+        Uses sampling for large columns to improve performance.
         
         Args:
             series: The categorical pandas Series to summarize.
@@ -86,19 +160,35 @@ class StatisticalSummarizer:
                 'valid_count': 0
             }
         
-        # Calculate unique count
-        unique_count = int(non_null.nunique())
-        
-        # Get mode
-        mode = non_null.mode()
-        mode_value = mode.iloc[0] if len(mode) > 0 else None
-        mode_frequency = int(non_null[non_null == mode_value].count()) if mode_value is not None else 0
-        
-        # Get frequency distribution (top 10)
-        value_counts = non_null.value_counts()
-        frequency_distribution = {
-            str(k): int(v) for k, v in value_counts.head(10).items()
-        }
+        # Calculate unique count - use sampling for very large columns
+        sample_size = 5000
+        if len(non_null) > sample_size:
+            # Sample for unique count estimation
+            sample = non_null.sample(n=sample_size, random_state=42)
+            unique_count = int(sample.nunique() * (len(non_null) / sample_size))
+            
+            # Get frequency distribution from sample (top 10)
+            value_counts = sample.value_counts()
+            frequency_distribution = {
+                str(k): int(v) for k, v in value_counts.head(10).items()
+            }
+            
+            # Estimate mode from sample
+            mode_value = value_counts.index[0] if len(value_counts) > 0 else None
+            mode_frequency = int(value_counts.iloc[0]) if len(value_counts) > 0 else 0
+        else:
+            # Full calculation for smaller columns
+            unique_count = int(non_null.nunique())
+            
+            # Get frequency distribution (top 10)
+            value_counts = non_null.value_counts()
+            frequency_distribution = {
+                str(k): int(v) for k, v in value_counts.head(10).items()
+            }
+            
+            # Get mode
+            mode_value = value_counts.index[0] if len(value_counts) > 0 else None
+            mode_frequency = int(value_counts.iloc[0]) if len(value_counts) > 0 else 0
         
         return {
             'unique_count': unique_count,

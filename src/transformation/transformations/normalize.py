@@ -24,35 +24,80 @@ class NormalizeTransformation(BaseTransformation):
 
         result = data.copy()
 
+        # Convert to numeric first, coercing errors to NaN
+        numeric_col = pd.to_numeric(data[column], errors='coerce')
+        
+        # Check if we have valid numeric data
+        valid_count = numeric_col.notna().sum()
+        if valid_count == 0:
+            # No valid numeric data, skip transformation
+            return result
+
+        # Get valid (non-NaN) values for calculation
+        valid_values = numeric_col.dropna()
+        
+        # Handle edge case: single value or constant column
+        if len(valid_values) == 1:
+            # Single value - for standard, set to 0; for minmax, set to 0.5
+            if method == "standard":
+                result[column] = 0
+                self.set_metadata("mean", float(valid_values.iloc[0]))
+                self.set_metadata("std", 0)
+                self.set_metadata("method", "standard")
+            else:
+                result[column] = 0.5
+                self.set_metadata("min", float(valid_values.iloc[0]))
+                self.set_metadata("max", float(valid_values.iloc[0]))
+                self.set_metadata("method", "minmax")
+            return result
+
         if method == "standard":
             # Z-score normalization (standardization)
-            mean = data[column].mean()
-            std = data[column].std()
+            mean = valid_values.mean()
+            std = valid_values.std(ddof=1)  # Use sample std (ddof=1) for proper normalization
 
-            if std > 0:
-                result[column] = (data[column] - mean) / std
-            else:
+            # Handle edge case where std is 0 or NaN (constant column)
+            if pd.isna(std) or std == 0:
                 result[column] = 0
+            else:
+                result[column] = (numeric_col - mean) / std
 
             # Store metadata for reversal
-            self.set_metadata("mean", mean)
-            self.set_metadata("std", std)
+            self.set_metadata("mean", float(mean) if not pd.isna(mean) else 0.0)
+            self.set_metadata("std", float(std) if not pd.isna(std) else 1.0)
             self.set_metadata("method", "standard")
 
         elif method == "minmax":
             # Min-max normalization to [0, 1]
-            min_val = data[column].min()
-            max_val = data[column].max()
+            min_val = valid_values.min()
+            max_val = valid_values.max()
 
-            if max_val > min_val:
-                result[column] = (data[column] - min_val) / (max_val - min_val)
+            # Handle edge cases
+            if pd.isna(min_val) or pd.isna(max_val) or max_val == min_val:
+                result[column] = 0.5 if valid_count > 0 else 0
             else:
-                result[column] = 0
+                result[column] = (numeric_col - min_val) / (max_val - min_val)
 
             # Store metadata for reversal
-            self.set_metadata("min", min_val)
-            self.set_metadata("max", max_val)
+            self.set_metadata("min", float(min_val) if not pd.isna(min_val) else 0.0)
+            self.set_metadata("max", float(max_val) if not pd.isna(max_val) else 1.0)
             self.set_metadata("method", "minmax")
+        
+        elif method == "robust":
+            # Robust normalization using median and IQR
+            median = valid_values.median()
+            q75 = valid_values.quantile(0.75)
+            q25 = valid_values.quantile(0.25)
+            iqr = q75 - q25
+            
+            if pd.isna(iqr) or iqr == 0:
+                result[column] = 0 if valid_count > 0 else np.nan
+            else:
+                result[column] = (numeric_col - median) / iqr
+            
+            self.set_metadata("median", float(median) if not pd.isna(median) else 0.0)
+            self.set_metadata("iqr", float(iqr) if not pd.isna(iqr) else 1.0)
+            self.set_metadata("method", "robust")
 
         return result
 

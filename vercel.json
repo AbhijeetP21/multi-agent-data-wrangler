@@ -1,0 +1,12 @@
+{
+  "build": {
+    "pip": "requirements.txt",
+    "preset": "streamlit"
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
+  ]
+}

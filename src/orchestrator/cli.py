@@ -32,20 +32,21 @@ def setup_logging(level: str = "INFO") -> None:
 def load_modules():
     """Load and instantiate all required modules."""
     # Import modules from the package
-    from src.data_profiling.profiler import DataProfiler as ProfilerImpl
+    from src.data_profiling.profiler import DataProfilerService as ProfilerImpl
     from src.transformation.candidate_generator import CandidateGenerator
     from src.transformation.executor import TransformationExecutor
-    from src.validation.validator import IntegrityValidator
-    from src.quality_scoring.scorer import QualityScorer as ScorerImpl
-    from src.ranking.ranker import RankingEngine as RankerImpl
+    from src.validation.validator import ValidationService
+    from src.quality_scoring.scorer import QualityScorerService as ScorerImpl
+    from src.ranking.ranker import RankingService as RankerImpl
+    from src.ranking.policies import ImprovementPolicy
     
     # Create instances
     profiler = ProfilerImpl()
     transformation_engine = CandidateGenerator()
     executor = TransformationExecutor()
-    validation_engine = IntegrityValidator()
+    validation_engine = ValidationService()
     quality_scorer = ScorerImpl()
-    ranking_engine = RankerImpl()
+    ranking_engine = RankerImpl(policy=ImprovementPolicy())
     
     # Create combined transformation engine
     class CombinedTransformationEngine:
@@ -54,7 +55,7 @@ def load_modules():
             self.executor = executor
         
         def generate_candidates(self, profile):
-            return self.generator.generate(profile)
+            return self.generator.generate_candidates(profile)
         
         def execute(self, data, transformation):
             return self.executor.execute(data, transformation)

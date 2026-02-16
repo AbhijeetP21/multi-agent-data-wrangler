@@ -7,6 +7,10 @@ import pandas as pd
 from .base import BaseMetric
 
 
+# Performance thresholds
+LARGE_DATASET_SAMPLE = 50000
+
+
 class ConsistencyMetric(BaseMetric):
     """Metric that calculates data type consistency across columns."""
 
@@ -16,6 +20,8 @@ class ConsistencyMetric(BaseMetric):
 
         Checks if values in each column are consistent with their inferred type.
         A column is consistent if most values match the expected dtype.
+
+        Uses sampling for very large datasets to improve performance.
 
         Args:
             data: The DataFrame to calculate consistency for.
@@ -30,6 +36,13 @@ class ConsistencyMetric(BaseMetric):
         if data.shape[1] == 0:
             return 1.0
 
+        total_rows = len(data)
+        
+        # Use sampling for very large datasets
+        if total_rows > LARGE_DATASET_SAMPLE:
+            sample_size = min(10000, total_rows)
+            data = data.sample(n=sample_size, random_state=42)
+        
         consistency_scores = []
 
         for col in data.columns:

@@ -9,9 +9,11 @@ from src.common.types.pipeline import PipelineConfig, PipelineState, PipelineSte
 from src.common.types.data_profile import DataProfile
 from src.common.types.transformation import Transformation, TransformationResult
 from src.common.types.ranking import TransformationCandidate, RankedTransformation
+from src.transformation.dag import TransformationDAG, TransformationDAGBuilder
 
 from .agent_coordinator import AgentCoordinator
 from .state_manager import StateManager
+from .failure_recovery import FailureRecovery, FailureStrategy, RetryConfig
 from .interfaces import PipelineResult
 
 
@@ -25,16 +27,29 @@ class PipelineManager:
         self,
         coordinator: AgentCoordinator,
         state_manager: Optional[StateManager] = None,
+        failure_strategy: FailureStrategy = FailureStrategy.SKIP,
+        max_retries: int = 3,
     ):
         """Initialize the pipeline manager.
 
         Args:
             coordinator: Agent coordinator instance
             state_manager: Optional state manager for persistence
+            failure_strategy: Strategy for handling failures (SKIP, RETRY, ABORT, FALLBACK)
+            max_retries: Maximum number of retries for RETRY strategy
         """
         self.coordinator = coordinator
         self.state_manager = state_manager or StateManager()
         self._current_state: Optional[PipelineState] = None
+        
+        # Initialize failure recovery
+        self.failure_recovery = FailureRecovery(
+            strategy=failure_strategy,
+            retry_config=RetryConfig(max_retries=max_retries)
+        )
+        
+        # Transformation DAG for dependency management
+        self._dag: Optional[TransformationDAG] = None
 
     def run(
         self,
@@ -229,7 +244,8 @@ class PipelineManager:
                 candidates.append(candidate)
                 
             except Exception as e:
-                logger.warning(f"Failed to process transformation {transformation.id}: {e}")
+                import traceback
+                logger.warning(f"Failed to process transformation {transformation.id}: {e}\n{traceback.format_exc()}")
                 continue
         
         state.candidates = candidates

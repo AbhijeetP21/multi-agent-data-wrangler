@@ -42,7 +42,6 @@ def setup_logging(
         processors.append(
             structlog.dev.ConsoleRenderer(
                 colors=True,
-                timestamp_format="%Y-%m-%d %H:%M:%S",
             )
         )
 

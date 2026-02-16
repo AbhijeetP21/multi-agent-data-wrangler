@@ -5,8 +5,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from data_profiling import DataProfilerService
-from common.types import DataProfile
+from src.data_profiling import DataProfilerService
+from src.common.types import DataProfile
 
 
 class TestDataProfilerService:

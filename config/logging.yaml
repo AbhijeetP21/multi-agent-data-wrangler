@@ -1,0 +1,83 @@
+# Logging Configuration
+# Multi-Agent Data Wrangler
+
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  standard:
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+  
+  detailed:
+    format: "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+  
+  json:
+    class: structlog.stdlib.ProcessorFormatter
+    processor: structlog.processors.JSONRenderer
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: standard
+    stream: ext://sys.stdout
+  
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/app.log
+    maxBytes: 10485760  # 10MB
+    backupCount: 5
+    encoding: utf8
+  
+  error_file:
+    class: logging.handlers.RotatingFileHandler
+    level: ERROR
+    formatter: detailed
+    filename: logs/error.log
+    maxBytes: 10485760  # 10MB
+    backupCount: 5
+    encoding: utf8
+
+loggers:
+  src:
+    level: DEBUG
+    handlers: [console, file, error_file]
+    propagate: false
+  
+  src.profiling:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.transformation:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.validation:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.quality_scoring:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.ranking:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.orchestrator:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+
+root:
+  level: INFO
+  handlers: [console, file]

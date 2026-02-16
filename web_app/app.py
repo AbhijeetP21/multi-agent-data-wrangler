@@ -226,7 +226,7 @@ def display_pipeline_flow():
 
 def display_profile(profile: Any):
     """Display data profile information."""
-    st.markdown("### 📊 Data Profile")
+    st.markdown("### Data Profile")
     
     if profile is None:
         st.warning("No profile data available")
@@ -401,7 +401,7 @@ def main():
         result = st.session_state.pipeline_result
         
         st.markdown("---")
-        st.markdown("### 📊 Results")
+        st.markdown("### Results")
         
         tab1, tab2, tab3, tab4 = st.tabs(
             ["Data Profile", "Transformed Data", "Quality Scores", "Rankings"]
@@ -411,7 +411,7 @@ def main():
             display_profile(result.profile)
         
         with tab2:
-            st.markdown("### 📝 Transformed Data")
+            st.markdown("### Transformed Data")
             if result.data is not None:
                 st.dataframe(
                     result.data.head(max_preview),
@@ -429,7 +429,7 @@ def main():
                 st.warning("No transformed data available")
         
         with tab3:
-            st.markdown("### ⭐ Quality Scores")
+            st.markdown("### Quality Scores")
             
             # Show quality scores from the best transformation if available
             if result.ranked_transformations:
@@ -485,7 +485,7 @@ def main():
         with tab4:
             display_rankings(result.ranked_transformations)
         
-        st.markdown("### 💾 Download Report")
+        st.markdown("### Download Report")
         
         # Build comprehensive report
         report = {

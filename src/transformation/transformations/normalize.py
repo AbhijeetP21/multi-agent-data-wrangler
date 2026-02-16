@@ -27,6 +27,9 @@ class NormalizeTransformation(BaseTransformation):
         # Convert to numeric first, coercing errors to NaN
         numeric_col = pd.to_numeric(data[column], errors='coerce')
         
+        # Replace infinity values with NaN
+        numeric_col = numeric_col.replace([np.inf, -np.inf], np.nan)
+        
         # Check if we have valid numeric data
         valid_count = numeric_col.notna().sum()
         if valid_count == 0:

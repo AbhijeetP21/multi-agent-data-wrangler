@@ -9,6 +9,11 @@ from src.common.types.transformation import Transformation
 from src.transformation.transformations.base import BaseTransformation
 
 
+# Safety limits
+MAX_UNIQUE_FOR_ONEHOT = 1000  # Warn if more unique values than this
+MAX_UNIQUE_FOR_LABEL = 100000  # Hard limit for label encoding
+
+
 class EncodeCategoricalTransformation(BaseTransformation):
     """Transformation for encoding categorical variables."""
 
@@ -30,6 +35,25 @@ class EncodeCategoricalTransformation(BaseTransformation):
             # Label encoding - convert categories to integers
             # Get unique values and handle mixed types safely
             unique_values = self._get_sorted_unique_values(data[column])
+            
+            # Check for high cardinality
+            unique_count = len(unique_values)
+            if unique_count > MAX_UNIQUE_FOR_LABEL:
+                raise ValueError(
+                    f"Column '{column}' has {unique_count} unique values, "
+                    f"exceeding limit of {MAX_UNIQUE_FOR_LABEL}. "
+                    "Consider using target encoding or frequency encoding instead."
+                )
+            
+            if unique_count > MAX_UNIQUE_FOR_ONEHOT:
+                import warnings
+                warnings.warn(
+                    f"Column '{column}' has {unique_count} unique values. "
+                    f"One-hot encoding would create {unique_count} columns. "
+                    "Consider using label encoding instead.",
+                    UserWarning
+                )
+            
             mapping = {val: idx for idx, val in enumerate(unique_values)}
 
             # Map values, handling unknown values as -1
@@ -39,12 +63,23 @@ class EncodeCategoricalTransformation(BaseTransformation):
             self.set_metadata("mapping", mapping)
             self.set_metadata("method", "label")
             self.set_metadata("original_column", column)
+            self.set_metadata("unique_count", unique_count)
 
         elif method == "onehot":
             # One-hot encoding - create binary columns for each category
             # Handle NaN values by filling them first
             fill_value = self.params.get("fill_na", "Unknown")
             series_filled = data[column].fillna(fill_value)
+            
+            # Check cardinality before one-hot encoding
+            unique_count = series_filled.nunique()
+            if unique_count > MAX_UNIQUE_FOR_ONEHOT:
+                raise ValueError(
+                    f"Column '{column}' has {unique_count} unique values. "
+                    f"One-hot encoding would create {unique_count} columns, "
+                    f"exceeding limit of {MAX_UNIQUE_FOR_ONEHOT}. "
+                    "Consider using label encoding instead."
+                )
             
             dummies = pd.get_dummies(series_filled, prefix=column, drop_first=False)
 
@@ -57,6 +92,7 @@ class EncodeCategoricalTransformation(BaseTransformation):
             self.set_metadata("method", "onehot")
             self.set_metadata("original_column", column)
             self.set_metadata("fill_na", fill_value)
+            self.set_metadata("unique_count", unique_count)
 
         return result
     

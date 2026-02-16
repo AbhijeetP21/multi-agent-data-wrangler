@@ -1,0 +1,51 @@
+{
+  "project_name": "multi-agent-data-wrangler",
+  "version": "1.0.0",
+  "phase": 0,
+  "status": "completed",
+  "modules": {
+    "common": {
+      "status": "pending",
+      "dependencies": []
+    },
+    "data_profiling": {
+      "status": "pending",
+      "dependencies": ["common"]
+    },
+    "transformation": {
+      "status": "pending",
+      "dependencies": ["common", "data_profiling"]
+    },
+    "validation": {
+      "status": "pending",
+      "dependencies": ["common", "data_profiling", "transformation"]
+    },
+    "quality_scoring": {
+      "status": "pending",
+      "dependencies": ["common", "data_profiling"]
+    },
+    "ranking": {
+      "status": "pending",
+      "dependencies": ["common", "validation", "quality_scoring"]
+    },
+    "orchestrator": {
+      "status": "pending",
+      "dependencies": ["common", "data_profiling", "transformation", "validation", "quality_scoring", "ranking"]
+    }
+  },
+  "artifacts": {
+    "design_doc": "DESIGN.md",
+    "interfaces": ".cline/interfaces.md",
+    "delegation_plan": ".cline/delegation_plan.md",
+    "config": "config/pipeline.yaml",
+    "tests": "tests/"
+  },
+  "completed_tasks": [
+    "Phase 0: System architecture design",
+    "Folder structure created",
+    "Interface contracts defined",
+    "Delegation plan created",
+    "Project configuration files created"
+  ],
+  "active_task": null
+}

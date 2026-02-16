@@ -1,0 +1,81 @@
+# Pipeline Configuration
+# Multi-Agent Data Wrangler
+
+pipeline:
+  name: "data_wrangler"
+  version: "1.0.0"
+  description: "Production-grade evaluation-driven data wrangling system"
+
+# Data Configuration
+data:
+  input_path: "data/input.csv"
+  output_path: "data/output.csv"
+  profile_path: "data/profile.json"
+  candidates_path: "data/candidates/"
+
+# Profiling Configuration
+profiling:
+  enabled: true
+  detect_types: true
+  compute_statistics: true
+  missing_threshold: 0.5  # Flag columns with >50% missing
+
+# Transformation Configuration
+transformation:
+  enabled: true
+  max_candidates: 100
+  allowed_types:
+    - fill_missing
+    - normalize
+    - encode_categorical
+    - remove_outliers
+    - drop_duplicates
+    - cast_type
+  fill_missing_strategy: "mean"  # mean, median, mode, constant
+  outlier_method: "iqr"  # iqr, zscore
+  outlier_threshold: 1.5
+
+# Validation Configuration
+validation:
+  enabled: true
+  check_leakage: true
+  preserve_schema: true
+  row_count_tolerance: 0.1  # Allow 10% row loss
+  null_tolerance: 0.05  # Allow 5% new nulls
+
+# Quality Scoring Configuration
+quality:
+  enabled: true
+  metrics:
+    - completeness
+    - consistency
+    - validity
+    - uniqueness
+  weights:
+    completeness: 0.3
+    consistency: 0.3
+    validity: 0.3
+    uniqueness: 0.1
+  min_score_threshold: 0.5
+
+# Ranking Configuration
+ranking:
+  enabled: true
+  policy: "composite_score"  # composite_score, improvement
+  top_k: 10
+  min_improvement: 0.01
+
+# Orchestration Configuration
+orchestration:
+  state_dir: ".state"
+  checkpoint_interval: 10  # Save state every N candidates
+  failure_strategy: "skip"  # skip, abort, retry
+  max_retries: 3
+  log_level: "INFO"
+
+# Output Configuration
+output:
+  save_profile: true
+  save_candidates: true
+  save_report: true
+  report_format: "json"  # json, html
